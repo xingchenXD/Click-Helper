@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Click Helper",
+  "version": "1.0",
+  "description": "Click preset elements on the current page.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "action": {
+    "default_title": "Run click helper"
+  },
+  "options_page": "options.html",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["content.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
