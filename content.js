@@ -3,8 +3,16 @@ const DEFAULT_SETTINGS = {
   year: 2026,
   month: 5,
   day: 15,
-  court: "6\u53f7\u573a",
-  time: "19:10-20:10"
+  slots: [
+    {
+      court: "6\u53f7\u573a",
+      time: "19:10-20:10"
+    },
+    {
+      court: "7\u53f7\u573a",
+      time: "20:10-21:10"
+    }
+  ]
 };
 
 const TIME_RANGES = [
@@ -23,6 +31,16 @@ const TIME_RANGES = [
   "20:10-21:10",
   "21:10-22:10"
 ];
+
+function normalizeCourtName(value, fallback) {
+  const courtNumber = Number(String(value || "").match(/\d+/)?.[0]);
+
+  if (courtNumber >= 1 && courtNumber <= 8) {
+    return `${courtNumber}\u53f7\u573a`;
+  }
+
+  return fallback;
+}
 
 function findElement(selector, text) {
   const elements = [...document.querySelectorAll(selector)];
@@ -75,13 +93,24 @@ function sleep(ms) {
 async function getSettings() {
   try {
     const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
+    const slots = Array.isArray(settings.slots) && settings.slots.length >= 2
+      ? settings.slots
+      : [
+          {
+            court: settings.court || DEFAULT_SETTINGS.slots[0].court,
+            time: settings.time || DEFAULT_SETTINGS.slots[0].time
+          },
+          DEFAULT_SETTINGS.slots[1]
+        ];
 
     return {
       year: Number(settings.year) || DEFAULT_SETTINGS.year,
       month: Number(settings.month) || DEFAULT_SETTINGS.month,
       day: Number(settings.day) || DEFAULT_SETTINGS.day,
-      court: settings.court || DEFAULT_SETTINGS.court,
-      time: settings.time || DEFAULT_SETTINGS.time
+      slots: slots.slice(0, 2).map((slot, index) => ({
+        court: normalizeCourtName(slot.court, DEFAULT_SETTINGS.slots[index].court),
+        time: slot.time || DEFAULT_SETTINGS.slots[index].time
+      }))
     };
   } catch (error) {
     console.log("[click-helper] Failed to read settings:", error);
@@ -329,14 +358,19 @@ async function showCourtIfNeeded(courtName) {
     return true;
   }
 
-  const nextButton = document.querySelector(".hnu_btns_right");
-  if (!nextButton) {
+  const courtNumber = Number(courtName.match(/\d+/)?.[0]);
+  const buttonSelector = courtNumber === 8 ? ".hnu_btns_right" : ".hnu_btns_left";
+  const switchButton =
+    document.querySelector(buttonSelector) ||
+    document.querySelector(".hnu_btns_right, .hnu_btns_left");
+
+  if (!switchButton) {
     return false;
   }
 
   console.log("[click-helper] Court not visible, switching court page:", courtName);
   const previousSnapshot = getCalendarSnapshot();
-  clickElement(nextButton);
+  clickElement(switchButton);
   await waitForCalendarRefresh(previousSnapshot);
 
   return Boolean(getCourtTable(courtName));
@@ -395,20 +429,38 @@ async function selectCourtTime(courtName, timeRange) {
   return clickElement(clickable);
 }
 
+function clickConfirmReservation() {
+  const confirmButton = [...document.querySelectorAll("a")]
+    .find((link) => link.textContent.trim() === "\u786e\u5b9a\u9884\u7ea6");
+
+  if (!confirmButton) {
+    console.log("[click-helper] Confirm reservation button not found");
+    return false;
+  }
+
+  console.log("[click-helper] confirming reservation");
+  return clickElement(confirmButton);
+}
+
 async function runClickStage() {
   console.log("[click-helper] click stage started");
 
   const settings = await getSettings();
 
   await confirmInitialDialog();
-  await waitForLoadingDone();
+  await waitForLoadingDone();  //如果不需要插件点掉通知弹窗注释掉这两句 
+  
   const previousSnapshot = getCalendarSnapshot();
   await selectDate(settings.year, settings.month, settings.day);
   await waitForCalendarRefresh(previousSnapshot);
-  await selectCourtTime(settings.court, settings.time);
 
+  for (const slot of settings.slots) {
+    await selectCourtTime(slot.court, slot.time);
+    await sleep(300);
+  }
 
   await sleep(500);
+  clickConfirmReservation();
 }
 
 async function run() {
