@@ -1,12 +1,12 @@
 const COURTS = [
-  "1号场",
-  "2号场",
-  "3号场",
-  "4号场",
-  "5号场",
-  "6号场",
-  "7号场",
-  "8号场"
+  "1\u53f7\u573a",
+  "2\u53f7\u573a",
+  "3\u53f7\u573a",
+  "4\u53f7\u573a",
+  "5\u53f7\u573a",
+  "6\u53f7\u573a",
+  "7\u53f7\u573a",
+  "8\u53f7\u573a"
 ];
 
 const TIME_RANGES = [
@@ -32,25 +32,15 @@ const DEFAULT_SETTINGS = {
   day: 15,
   slots: [
     {
-      court: "6号场",
+      court: "6\u53f7\u573a",
       time: "19:10-20:10"
     },
     {
-      court: "7号场",
-      time: "20:10-21:10"
+      court: "7\u53f7\u573a",
+      time: ""
     }
   ]
 };
-
-function normalizeCourtName(value, fallback) {
-  const courtNumber = Number(String(value || "").match(/\d+/)?.[0]);
-
-  if (courtNumber >= 1 && courtNumber <= 8) {
-    return `${courtNumber}号场`;
-  }
-
-  return fallback;
-}
 
 const dateInput = document.querySelector("#date");
 const courtSelects = [
@@ -63,6 +53,16 @@ const timeSelects = [
 ];
 const saveButton = document.querySelector("#save");
 const statusText = document.querySelector("#status");
+
+function normalizeCourtName(value, fallback) {
+  const courtNumber = Number(String(value || "").match(/\d+/)?.[0]);
+
+  if (courtNumber >= 1 && courtNumber <= 8) {
+    return `${courtNumber}\u53f7\u573a`;
+  }
+
+  return fallback;
+}
 
 function pad(value) {
   return String(value).padStart(2, "0");
@@ -81,8 +81,15 @@ function setStatus(text) {
   statusText.textContent = text;
 }
 
-function fillSelect(select, values) {
+function fillSelect(select, values, blankLabel = "") {
   select.textContent = "";
+
+  if (blankLabel) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = blankLabel;
+    select.append(option);
+  }
 
   values.forEach((value) => {
     const option = document.createElement("option");
@@ -93,30 +100,36 @@ function fillSelect(select, values) {
 }
 
 function normalizeSettings(settings) {
-  const slots = Array.isArray(settings.slots) && settings.slots.length >= 2
+  const slots = Array.isArray(settings.slots) && settings.slots.length
     ? settings.slots
     : [
         {
           court: settings.court || DEFAULT_SETTINGS.slots[0].court,
           time: settings.time || DEFAULT_SETTINGS.slots[0].time
-        },
-        DEFAULT_SETTINGS.slots[1]
+        }
       ];
+
+  const normalizedSlots = DEFAULT_SETTINGS.slots.map((fallback, index) => {
+    const slot = slots[index] || fallback;
+
+    return {
+      court: normalizeCourtName(slot.court, fallback.court),
+      time: slot.time || fallback.time
+    };
+  });
 
   return {
     year: Number(settings.year) || DEFAULT_SETTINGS.year,
     month: Number(settings.month) || DEFAULT_SETTINGS.month,
     day: Number(settings.day) || DEFAULT_SETTINGS.day,
-    slots: slots.slice(0, 2).map((slot, index) => ({
-      court: normalizeCourtName(slot.court, DEFAULT_SETTINGS.slots[index].court),
-      time: slot.time || DEFAULT_SETTINGS.slots[index].time
-    }))
+    slots: normalizedSlots
   };
 }
 
 async function loadSettings() {
   courtSelects.forEach((select) => fillSelect(select, COURTS));
-  timeSelects.forEach((select) => fillSelect(select, TIME_RANGES));
+  fillSelect(timeSelects[0], TIME_RANGES);
+  fillSelect(timeSelects[1], TIME_RANGES, "\u4E0D\u9009\u7B2C\u4E8C\u4E2A\u65F6\u6BB5");
 
   const settings = normalizeSettings(
     await chrome.storage.sync.get(DEFAULT_SETTINGS)
@@ -131,16 +144,18 @@ async function loadSettings() {
 
 async function saveSettings() {
   if (!dateInput.value) {
-    throw new Error("请选择日期");
+    throw new Error("\u8BF7\u9009\u62E9\u65E5\u671F");
   }
 
-  const slots = courtSelects.map((courtSelect, index) => ({
-    court: courtSelect.value,
-    time: timeSelects[index].value
-  }));
+  const slots = courtSelects
+    .map((courtSelect, index) => ({
+      court: courtSelect.value,
+      time: timeSelects[index].value
+    }))
+    .filter((slot, index) => index === 0 || slot.time);
 
-  if (slots[0].time === slots[1].time) {
-    throw new Error("两个时间不能一样");
+  if (slots.length > 1 && slots[0].time === slots[1].time) {
+    throw new Error("\u4E24\u4E2A\u65F6\u95F4\u4E0D\u80FD\u4E00\u6837");
   }
 
   const date = fromDateValue(dateInput.value);
@@ -153,14 +168,14 @@ async function saveSettings() {
 
 saveButton.addEventListener("click", async () => {
   saveButton.disabled = true;
-  setStatus("正在保存...");
+  setStatus("\u6B63\u5728\u4FDD\u5B58...");
 
   try {
     await saveSettings();
-    setStatus("已保存，点击插件图标会直接运行");
+    setStatus("\u5DF2\u4FDD\u5B58\uFF0C\u70B9\u51FB\u63D2\u4EF6\u56FE\u6807\u4F1A\u76F4\u63A5\u8FD0\u884C");
   } catch (error) {
     console.error(error);
-    setStatus(error.message || "保存失败");
+    setStatus(error.message || "\u4FDD\u5B58\u5931\u8D25");
   } finally {
     saveButton.disabled = false;
   }
@@ -168,5 +183,5 @@ saveButton.addEventListener("click", async () => {
 
 loadSettings().catch((error) => {
   console.error(error);
-  setStatus("读取设置失败");
+  setStatus("\u8BFB\u53D6\u8BBE\u7F6E\u5931\u8D25");
 });

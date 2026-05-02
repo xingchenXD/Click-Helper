@@ -10,7 +10,7 @@ const DEFAULT_SETTINGS = {
     },
     {
       court: "7\u53f7\u573a",
-      time: "20:10-21:10"
+      time: ""
     }
   ]
 };
@@ -93,24 +93,26 @@ function sleep(ms) {
 async function getSettings() {
   try {
     const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
-    const slots = Array.isArray(settings.slots) && settings.slots.length >= 2
+    const slots = Array.isArray(settings.slots) && settings.slots.length
       ? settings.slots
       : [
           {
             court: settings.court || DEFAULT_SETTINGS.slots[0].court,
             time: settings.time || DEFAULT_SETTINGS.slots[0].time
-          },
-          DEFAULT_SETTINGS.slots[1]
+          }
         ];
 
     return {
       year: Number(settings.year) || DEFAULT_SETTINGS.year,
       month: Number(settings.month) || DEFAULT_SETTINGS.month,
       day: Number(settings.day) || DEFAULT_SETTINGS.day,
-      slots: slots.slice(0, 2).map((slot, index) => ({
-        court: normalizeCourtName(slot.court, DEFAULT_SETTINGS.slots[index].court),
-        time: slot.time || DEFAULT_SETTINGS.slots[index].time
-      }))
+      slots: slots
+        .slice(0, 2)
+        .map((slot, index) => ({
+          court: normalizeCourtName(slot.court, DEFAULT_SETTINGS.slots[index].court),
+          time: slot.time || DEFAULT_SETTINGS.slots[index].time
+        }))
+        .filter((slot) => slot.time)
     };
   } catch (error) {
     console.log("[click-helper] Failed to read settings:", error);
@@ -447,8 +449,8 @@ async function runClickStage() {
 
   const settings = await getSettings();
 
-  await confirmInitialDialog();
-  await waitForLoadingDone();  //如果不需要插件点掉通知弹窗注释掉这两句 
+  // await confirmInitialDialog();
+  // await waitForLoadingDone();  //如果不需要插件点掉通知弹窗注释掉这两句 
   
   const previousSnapshot = getCalendarSnapshot();
   await selectDate(settings.year, settings.month, settings.day);
@@ -458,9 +460,9 @@ async function runClickStage() {
     await selectCourtTime(slot.court, slot.time);
     await sleep(300);
   }
-
+  //验证码相关加在这就行
   await sleep(500);
-  clickConfirmReservation();
+  clickConfirmReservation(); //确认预约按钮
 }
 
 async function run() {
